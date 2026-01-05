@@ -114,7 +114,10 @@ function parseLedgerDate(value) {
   // - 01/16/2024 (month/day/year)
   // - 7-3-2024 (day-month-year)
   // We try a small set of explicit patterns.
-  const patterns = ['M/d/yyyy', 'MM/dd/yyyy', 'd-M-yyyy', 'dd-MM-yyyy']
+  // Note: Some XLSX exports/formats show dates as 7/3/2024 while the CSV
+  // version uses 7-3-2024 to mean day-month-year. We therefore prefer
+  // day/month for slash dates first, then fall back to month/day.
+  const patterns = ['d/M/yyyy', 'dd/MM/yyyy', 'M/d/yyyy', 'MM/dd/yyyy', 'd-M-yyyy', 'dd-MM-yyyy']
 
   for (const pattern of patterns) {
     const dt = parse(raw, pattern, new Date())

@@ -7,6 +7,7 @@ const crypto = require('node:crypto')
 
 const { generateCashflowPdfFromRows } = require('./src/report/generateCashflowReport')
 const { decodeBase64Payload, loadFmsecLedgerRowsFromBuffer } = require('./src/report/uploadedLedger')
+const { xlsxBufferToCsv } = require('./src/report/xlsxToCsv')
 
 const app = express()
 const normalizeBasePath = (value) => {
@@ -48,40 +49,64 @@ router.get('/', (req, res) => {
 
 router.post('/api/report/fmsec/pdf', async (req, res) => {
     try {
-            const { filename, dataBase64, year } = req.body ?? {}
-            const resolvedYear = Number.isFinite(Number(year)) ? Number(year) : 2024
+        const { filename, dataBase64, year } = req.body ?? {}
+        const resolvedYear = Number.isFinite(Number(year)) ? Number(year) : 2024
 
-            const uploadBuffer = decodeBase64Payload(dataBase64)
+        const originalName = String(filename ?? '').trim()
+        if (!originalName) {
+            throw new Error('filename is required')
+        }
 
-            const storageDir = path.join(__dirname, 'storage')
-            await fs.mkdir(storageDir, { recursive: true })
+        const ext = path.extname(originalName).toLowerCase()
+        if (ext !== '.csv' && ext !== '.xlsx') {
+            throw new Error('Only .csv and .xlsx files are supported')
+        }
 
-            const originalName = String(filename ?? 'upload')
-            const safeName = originalName
-                .replace(/[/\\]/g, '_')
-                .replace(/[^a-zA-Z0-9._-]/g, '_')
-                .slice(0, 120)
-                .replace(/^_+/, '') || 'upload'
+        if (!dataBase64) {
+            throw new Error('dataBase64 is required')
+        }
 
-            const storedName = `${Date.now()}-${crypto.randomUUID()}-${safeName}`
-            const storedPath = path.join(storageDir, storedName)
-            await fs.writeFile(storedPath, uploadBuffer)
+        const uploadBuffer = decodeBase64Payload(dataBase64)
 
-            const rows = loadFmsecLedgerRowsFromBuffer({ filename: originalName, buffer: uploadBuffer })
-            const pdfBuffer = await generateCashflowPdfFromRows(rows, {
-                    year: resolvedYear,
-                    title: 'FMSEC Cashflow Report',
-                    subtitle: 'Monthly Deposits / Withdrawals / Dividends',
-                    filename,
-            })
+        const storageDir = path.join(__dirname, 'storage')
+        await fs.mkdir(storageDir, { recursive: true })
 
-            res.setHeader('Content-Type', 'application/pdf')
-            res.setHeader('Content-Disposition', 'inline; filename="cashflow.pdf"')
-            res.send(pdfBuffer)
+        const safeName = originalName
+            .replace(/[/\\]/g, '_')
+            .replace(/[^a-zA-Z0-9._-]/g, '_')
+            .slice(0, 120)
+            .replace(/^_+/, '') || 'upload'
+
+        const storedName = `${Date.now()}-${crypto.randomUUID()}-${safeName}`
+        const storedPath = path.join(storageDir, storedName)
+        await fs.writeFile(storedPath, uploadBuffer)
+
+        const normalizedCsvFilename = ext === '.xlsx'
+            ? `${originalName.slice(0, -ext.length)}.csv`
+            : originalName
+
+        const normalizedCsvBuffer = ext === '.xlsx'
+            ? Buffer.from(
+                xlsxBufferToCsv({ buffer: uploadBuffer }),
+                'utf8',
+            )
+            : uploadBuffer
+
+        const rows = loadFmsecLedgerRowsFromBuffer({ filename: normalizedCsvFilename, buffer: normalizedCsvBuffer })
+        const pdfBuffer = await generateCashflowPdfFromRows(rows, {
+                year: resolvedYear,
+                title: 'FMSEC Cashflow Report',
+                subtitle: 'Monthly Deposits / Withdrawals / Dividends',
+                filename,
+        })
+
+        res.setHeader('Content-Type', 'application/pdf')
+        res.setHeader('Content-Disposition', 'inline; filename="cashflow.pdf"')
+        res.send(pdfBuffer)
     } catch (err) {
-            // eslint-disable-next-line no-console
-            console.error(err)
-            res.status(400).send(err?.message ? String(err.message) : 'Failed to generate PDF')
+        // eslint-disable-next-line no-console
+        console.error(err)
+        res.status(400).send(err?.message ? String(err.message) : 'Failed to generate PDF')
     }
 })
 
