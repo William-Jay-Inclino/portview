@@ -66,7 +66,7 @@ npm run pm2:start
 npm run pm2:logs
 ```
 
-By default the PM2 config sets `PORT=6000`. Change it in `ecosystem.config.cjs` if needed.
+The PM2 config reads `PORT`, `BASE_PATH`, and `BASE_URL` from `.env` (via `dotenv`).
 
 ### Serving under a subpath (/portview)
 
@@ -78,6 +78,10 @@ Optional (useful when you need absolute URLs):
 - `BASE_URL=https://jaytechsolutions.cloud`
 
 When `BASE_PATH` is set, both the UI route and API routes are mounted under that prefix.
+
+### Nginx (serve at /portview)
+
+See `deploy/nginx-portview.conf.example` for a safe `location /portview/` configuration (handles the trailing slash correctly).
 
 ### 4) Start on boot
 

@@ -1,3 +1,5 @@
+require('dotenv').config()
+
 module.exports = {
   apps: [
     {
@@ -7,8 +9,9 @@ module.exports = {
       instances: 1,
       env: {
         NODE_ENV: 'production',
-        PORT: 8000,
-        BASE_PATH: '/portview',
+        PORT: process.env.PORT || '8000',
+        BASE_PATH: process.env.BASE_PATH || '/portview',
+        BASE_URL: process.env.BASE_URL || '',
       },
     },
   ],
