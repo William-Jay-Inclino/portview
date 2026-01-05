@@ -9,6 +9,17 @@ const { generateCashflowPdfFromRows } = require('./src/report/generateCashflowRe
 const { decodeBase64Payload, loadFmsecLedgerRowsFromBuffer } = require('./src/report/uploadedLedger')
 
 const app = express()
+const normalizeBasePath = (value) => {
+    const raw = String(value || '').trim()
+    if (!raw || raw === '/') return ''
+    const withLeadingSlash = raw.startsWith('/') ? raw : `/${raw}`
+    const withoutTrailingSlash = withLeadingSlash.replace(/\/+$/, '')
+    return withoutTrailingSlash === '/' ? '' : withoutTrailingSlash
+}
+
+const basePath = normalizeBasePath(process.env.BASE_PATH)
+app.locals.basePath = basePath
+
 const port = Number(process.env.PORT) || 6000
 
 app.use(express.json({ limit: '50mb' }))
@@ -16,11 +27,17 @@ app.use(express.json({ limit: '50mb' }))
 app.set('view engine', 'ejs')
 app.set('views', path.join(__dirname, 'views'))
 
-app.get('/', (req, res) => {
+if (basePath) {
+    app.get('/', (req, res) => res.redirect(basePath))
+}
+
+const router = express.Router()
+
+router.get('/', (req, res) => {
     res.render('index')
 })
 
-app.post('/api/report/fmsec/pdf', async (req, res) => {
+router.post('/api/report/fmsec/pdf', async (req, res) => {
     try {
             const { filename, dataBase64, year } = req.body ?? {}
             const resolvedYear = Number.isFinite(Number(year)) ? Number(year) : 2024
@@ -58,6 +75,8 @@ app.post('/api/report/fmsec/pdf', async (req, res) => {
             res.status(400).send(err?.message ? String(err.message) : 'Failed to generate PDF')
     }
 })
+
+app.use(basePath || '/', router)
 
 app.listen(port, () => {
     console.log(`Portview listening on port ${port} (NODE_ENV=${process.env.NODE_ENV || 'development'})`)

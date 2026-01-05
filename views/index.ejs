@@ -154,6 +154,7 @@
     </div>
 
     <script>
+      const BASE_PATH = "<%= basePath %>";
       const form = document.getElementById('uploadForm');
       const fileInput = document.getElementById('file');
       const statusEl = document.getElementById('status');
@@ -194,7 +195,7 @@
 
           const dataUrl = await readFileAsDataUrl(file);
 
-          const resp = await fetch('/api/report/fmsec/pdf', {
+          const resp = await fetch(`${BASE_PATH}/api/report/fmsec/pdf`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({

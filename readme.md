@@ -42,6 +42,7 @@ It is designed to:
 This app is a plain Node/Express server (no build step). For production you mainly want:
 - `NODE_ENV=production`
 - a configurable `PORT`
+- a configurable `BASE_PATH` if serving under a subpath (e.g. `/portview`)
 - Playwright's Chromium installed on the server (for PDF generation)
 - a process manager (PM2) to keep it running and restart on reboot
 
@@ -66,6 +67,14 @@ npm run pm2:logs
 ```
 
 By default the PM2 config sets `PORT=6000`. Change it in `ecosystem.config.cjs` if needed.
+
+### Serving under a subpath (/portview)
+
+If you want to access the app at `http://localhost:8000/portview`, set:
+- `PORT=8000`
+- `BASE_PATH=/portview`
+
+When `BASE_PATH` is set, both the UI route and API routes are mounted under that prefix.
 
 ### 4) Start on boot
 
