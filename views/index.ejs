@@ -1,0 +1,223 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Portview</title>
+    <style>
+      :root {
+        --bg: #f6f7fb;
+        --card: #ffffff;
+        --text: #111827;
+        --muted: #4b5563;
+        --border: #e5e7eb;
+        --shadow: 0 10px 30px rgba(0,0,0,0.08);
+        --primary: #111827;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, "Helvetica Neue", Helvetica, sans-serif;
+        color: var(--text);
+        background: var(--bg);
+      }
+      .container {
+        max-width: 980px;
+        margin: 0 auto;
+        padding: 28px 18px 36px;
+      }
+      .header {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 14px;
+      }
+      h1 { margin: 0; font-size: 22px; letter-spacing: -0.01em; }
+      .tag {
+        font-size: 12px;
+        color: var(--muted);
+        border: 1px solid var(--border);
+        background: #fff;
+        padding: 4px 10px;
+        border-radius: 999px;
+        white-space: nowrap;
+      }
+      .card {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        box-shadow: var(--shadow);
+        padding: 16px;
+      }
+      .hint {
+        color: var(--muted);
+        margin: 0 0 14px;
+        line-height: 1.45;
+      }
+      .hint strong { color: var(--text); }
+      .formRow {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        flex-wrap: wrap;
+      }
+      input[type="file"] {
+        flex: 1;
+        min-width: 240px;
+        padding: 10px;
+        border: 1px dashed var(--border);
+        border-radius: 10px;
+        background: #fafafa;
+      }
+      button {
+        appearance: none;
+        border: 1px solid #0f172a;
+        background: var(--primary);
+        color: #fff;
+        border-radius: 10px;
+        padding: 10px 14px;
+        cursor: pointer;
+        font-weight: 600;
+      }
+      button[disabled] {
+        opacity: 0.6;
+        cursor: not-allowed;
+      }
+      .meta {
+        margin-top: 10px;
+        font-size: 12px;
+        color: var(--muted);
+      }
+      .status {
+        margin-top: 12px;
+        font-size: 13px;
+        color: var(--muted);
+      }
+      .status.error { color: #b91c1c; }
+      .status.ok { color: #065f46; }
+      .viewer {
+        margin-top: 14px;
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        overflow: hidden;
+        background: #fff;
+      }
+      iframe { width: 100%; height: 72vh; border: 0; display: block; }
+      code { background: #f3f4f6; padding: 1px 6px; border-radius: 6px; }
+
+      .footer {
+        margin-top: 16px;
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        flex-wrap: wrap;
+        color: var(--muted);
+        font-size: 12px;
+      }
+      .footer a { color: inherit; text-decoration: underline; }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="header">
+        <h1>Portview</h1>
+        <div class="tag">FMSEC Ledger → Cashflow PDF</div>
+      </div>
+
+      <div class="card">
+        <p class="hint">
+          Upload a yearly ledger. Only FirstMetroSec is supported for now.
+          Use a <code>.csv</code> or <code>.xlsx</code> file to generate a cashflow PDF.
+          <strong>Important:</strong> Remove any password from the file before uploading so the app can parse it.
+        </p>
+
+        <form id="uploadForm">
+          <div class="formRow">
+            <input id="file" type="file" accept=".csv,.xlsx,.xls" required />
+            <button id="submitBtn" type="submit">Generate PDF</button>
+          </div>
+          <div class="meta">Tip: larger ledgers may take a few seconds to render.</div>
+        </form>
+
+        <div id="status" class="status"></div>
+
+        <div class="viewer">
+          <iframe id="pdfFrame" title="Generated PDF"></iframe>
+        </div>
+
+        <div class="footer">
+          <div>Developed by William Jay Inclino.</div>
+          <div>If you have any concerns, feel free to email <a href="mailto:wjay.inclino@gmail.com">wjay.inclino@gmail.com</a>.</div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const form = document.getElementById('uploadForm');
+      const fileInput = document.getElementById('file');
+      const statusEl = document.getElementById('status');
+      const frame = document.getElementById('pdfFrame');
+      const submitBtn = document.getElementById('submitBtn');
+      let lastObjectUrl = null;
+
+      function setStatus(msg, kind) {
+        statusEl.textContent = msg || '';
+        statusEl.className = kind ? `status ${kind}` : 'status';
+      }
+
+      function setBusy(busy) {
+        submitBtn.disabled = !!busy;
+        fileInput.disabled = !!busy;
+      }
+
+      function readFileAsDataUrl(file) {
+        return new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onerror = () => reject(new Error('Failed to read file'));
+          reader.onload = () => resolve(String(reader.result || ''));
+          reader.readAsDataURL(file);
+        });
+      }
+
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const file = fileInput.files && fileInput.files[0];
+        if (!file) return;
+
+        try {
+          setBusy(true);
+          setStatus('Generating PDF...');
+          frame.removeAttribute('src');
+          if (lastObjectUrl) URL.revokeObjectURL(lastObjectUrl);
+          lastObjectUrl = null;
+
+          const dataUrl = await readFileAsDataUrl(file);
+
+          const resp = await fetch('/api/report/fmsec/pdf', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              filename: file.name,
+              dataBase64: dataUrl,
+            }),
+          });
+
+          if (!resp.ok) {
+            const text = await resp.text().catch(() => '');
+            throw new Error(text || `Request failed: ${resp.status}`);
+          }
+
+          const blob = await resp.blob();
+          lastObjectUrl = URL.createObjectURL(blob);
+          frame.src = lastObjectUrl;
+          setStatus('Done.', 'ok');
+        } catch (err) {
+          setStatus(`Error: ${err && err.message ? err.message : String(err)}`, 'error');
+        } finally {
+          setBusy(false);
+        }
+      });
+    </script>
+  </body>
+</html>

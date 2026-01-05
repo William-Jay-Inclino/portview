@@ -1,0 +1,21 @@
+{
+  "name": "portview",
+  "private": true,
+  "scripts": {
+    "start": "node app.js",
+    "start:prod": "NODE_ENV=production node app.js",
+    "playwright:install": "playwright install --with-deps chromium",
+    "pm2:start": "pm2 start ecosystem.config.cjs",
+    "pm2:reload": "pm2 reload portview --update-env",
+    "pm2:stop": "pm2 stop portview",
+    "pm2:logs": "pm2 logs portview"
+  },
+  "dependencies": {
+    "@playwright/test": "^1.57.0",
+    "date-fns": "^4.1.0",
+    "ejs": "^3.1.10",
+    "express": "^5.2.1",
+    "xlsx": "^0.18.5"
+  },
+  "devDependencies": {}
+}
