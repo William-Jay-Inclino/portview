@@ -65,7 +65,7 @@ npm run pm2:start
 npm run pm2:logs
 ```
 
-By default the PM2 config sets `PORT=7000`. Change it in `ecosystem.config.cjs` if needed.
+By default the PM2 config sets `PORT=6000`. Change it in `ecosystem.config.cjs` if needed.
 
 ### 4) Start on boot
 

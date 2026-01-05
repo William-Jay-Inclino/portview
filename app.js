@@ -1,13 +1,15 @@
+require('dotenv').config()
+
 const express = require('express')
 const fs = require('node:fs/promises')
 const path = require('node:path')
 const crypto = require('node:crypto')
 
-const { generateCashflowPdfFromCsv, generateCashflowPdfFromRows } = require('./src/report/generateCashflowReport')
+const { generateCashflowPdfFromRows } = require('./src/report/generateCashflowReport')
 const { decodeBase64Payload, loadFmsecLedgerRowsFromBuffer } = require('./src/report/uploadedLedger')
 
 const app = express()
-const port = Number(process.env.PORT) || 7000
+const port = Number(process.env.PORT) || 6000
 
 app.use(express.json({ limit: '50mb' }))
 
