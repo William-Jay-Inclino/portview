@@ -74,6 +74,9 @@ If you want to access the app at `http://localhost:8000/portview`, set:
 - `PORT=8000`
 - `BASE_PATH=/portview`
 
+Optional (useful when you need absolute URLs):
+- `BASE_URL=https://jaytechsolutions.cloud`
+
 When `BASE_PATH` is set, both the UI route and API routes are mounted under that prefix.
 
 ### 4) Start on boot

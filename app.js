@@ -17,8 +17,17 @@ const normalizeBasePath = (value) => {
     return withoutTrailingSlash === '/' ? '' : withoutTrailingSlash
 }
 
+const normalizeBaseUrl = (value) => {
+    const raw = String(value || '').trim()
+    if (!raw) return ''
+    return raw.replace(/\/+$/, '')
+}
+
 const basePath = normalizeBasePath(process.env.BASE_PATH)
+const baseUrl = normalizeBaseUrl(process.env.BASE_URL)
 app.locals.basePath = basePath
+app.locals.baseUrl = baseUrl
+app.locals.publicUrl = baseUrl ? `${baseUrl}${basePath}` : basePath
 
 const port = Number(process.env.PORT) || 6000
 
