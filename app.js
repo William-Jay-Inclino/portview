@@ -8,6 +8,7 @@ const crypto = require('node:crypto')
 const { generateCashflowPdfFromRows } = require('./src/report/generateCashflowReport')
 const { decodeBase64Payload, loadFmsecLedgerRowsFromBuffer } = require('./src/report/uploadedLedger')
 const { xlsxBufferToCsv } = require('./src/report/xlsxToCsv')
+const { loadFmsecLedgerRowsFromPdfBuffer } = require('./src/report/fmsecLedgerPdf')
 
 const app = express()
 const normalizeBasePath = (value) => {
@@ -51,6 +52,9 @@ router.post('/api/report/fmsec/pdf', async (req, res) => {
     try {
         const { filename, dataBase64, year } = req.body ?? {}
         const resolvedYear = Number.isFinite(Number(year)) ? Number(year) : 2024
+        if (resolvedYear !== 2024 && resolvedYear !== 2025) {
+            throw new Error('year must be 2024 or 2025')
+        }
 
         const originalName = String(filename ?? '').trim()
         if (!originalName) {
@@ -58,8 +62,16 @@ router.post('/api/report/fmsec/pdf', async (req, res) => {
         }
 
         const ext = path.extname(originalName).toLowerCase()
-        if (ext !== '.csv' && ext !== '.xlsx') {
-            throw new Error('Only .csv and .xlsx files are supported')
+        const allowedExts = resolvedYear === 2025
+            ? new Set(['.pdf'])
+            : new Set(['.csv', '.xlsx', '.xls'])
+
+        if (!allowedExts.has(ext)) {
+            throw new Error(
+                resolvedYear === 2025
+                    ? 'For 2025, only .pdf files are supported'
+                    : 'For 2024, only .csv or .xlsx files are supported'
+            )
         }
 
         if (!dataBase64) {
@@ -81,23 +93,28 @@ router.post('/api/report/fmsec/pdf', async (req, res) => {
         const storedPath = path.join(storageDir, storedName)
         await fs.writeFile(storedPath, uploadBuffer)
 
-        const normalizedCsvFilename = ext === '.xlsx'
-            ? `${originalName.slice(0, -ext.length)}.csv`
-            : originalName
+        const rows = resolvedYear === 2025
+            ? await loadFmsecLedgerRowsFromPdfBuffer({ buffer: uploadBuffer })
+            : (() => {
+                const normalizedCsvFilename = (ext === '.xlsx' || ext === '.xls')
+                    ? `${originalName.slice(0, -ext.length)}.csv`
+                    : originalName
 
-        const normalizedCsvBuffer = ext === '.xlsx'
-            ? Buffer.from(
-                xlsxBufferToCsv({ buffer: uploadBuffer }),
-                'utf8',
-            )
-            : uploadBuffer
+                const normalizedCsvBuffer = (ext === '.xlsx' || ext === '.xls')
+                    ? Buffer.from(xlsxBufferToCsv({ buffer: uploadBuffer }), 'utf8')
+                    : uploadBuffer
 
-        const rows = loadFmsecLedgerRowsFromBuffer({ filename: normalizedCsvFilename, buffer: normalizedCsvBuffer })
+                return loadFmsecLedgerRowsFromBuffer({ filename: normalizedCsvFilename, buffer: normalizedCsvBuffer })
+            })()
+        
+        const pdfTitle = `FMSEC Cashflow Report (${resolvedYear})`
+        const outputFilename = `fmsec-cashflow-${resolvedYear}.pdf`
+
         const pdfBuffer = await generateCashflowPdfFromRows(rows, {
-                year: resolvedYear,
-                title: 'FMSEC Cashflow Report',
-                subtitle: 'Monthly Deposits / Withdrawals / Dividends',
-                filename,
+            year: resolvedYear,
+            title: pdfTitle,
+            subtitle: 'Monthly Deposits / Withdrawals / Dividends',
+            filename,
         })
 
         res.setHeader('Content-Type', 'application/pdf')

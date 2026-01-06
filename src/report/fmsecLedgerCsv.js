@@ -130,7 +130,8 @@ function parseLedgerDate(value) {
 function isDividendRow(row) {
   const cd = String(row.CD ?? '').trim().toUpperCase()
   const particulars = String(row.PARTICULARS ?? '').toLowerCase()
-  return cd === 'CM' && particulars.includes('cash dividend')
+  // FMSEC uses CM for cash dividends and also for bond coupon payments.
+  return cd === 'CM' && (particulars.includes('cash dividend') || particulars.includes('coupon payment'))
 }
 
 function isTradeRow(row) {

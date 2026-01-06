@@ -128,16 +128,21 @@
       <div class="card">
         <p class="hint">
           Upload a yearly ledger. Only FirstMetroSec is supported for now.
-          Use a <code>.csv</code> or <code>.xlsx</code> file to generate a cashflow PDF.
+          Choose a year, then upload the matching file type to generate a cashflow PDF.
           <strong>Important:</strong> Remove any password from the file before uploading so the app can parse it.
         </p>
 
         <form id="uploadForm">
           <div class="formRow">
-            <input id="file" type="file" accept=".csv,.xlsx,.xls" required />
+            <label for="year" style="font-size:12px;color:var(--muted)">Year</label>
+            <select id="year" required style="padding:10px;border:1px solid var(--border);border-radius:10px;background:#fff">
+              <option value="2024" selected>2024</option>
+              <option value="2025">2025</option>
+            </select>
+            <input id="file" type="file" required />
             <button id="submitBtn" type="submit">Generate PDF</button>
           </div>
-          <div class="meta">Tip: larger ledgers may take a few seconds to render.</div>
+          <div id="helper" class="meta"></div>
         </form>
 
         <div id="status" class="status"></div>
@@ -156,11 +161,50 @@
     <script>
       const BASE_PATH = "<%= basePath %>";
       const form = document.getElementById('uploadForm');
+      const yearEl = document.getElementById('year');
       const fileInput = document.getElementById('file');
+      const helperEl = document.getElementById('helper');
       const statusEl = document.getElementById('status');
       const frame = document.getElementById('pdfFrame');
       const submitBtn = document.getElementById('submitBtn');
       let lastObjectUrl = null;
+
+      const YEAR_RULES = {
+        2024: { accept: '.csv,.xlsx,.xls', label: 'Upload a FirstMetroSec yearly ledger (.csv or .xlsx). Tip: larger ledgers may take a few seconds to render.' },
+        2025: { accept: '.pdf', label: 'Upload a FirstMetroSec Statement of Account PDF for 2025 (.pdf). The app will extract cash movements and compute monthly deposits/withdrawals/dividends.' },
+      };
+
+      function getSelectedYear() {
+        const y = Number(yearEl && yearEl.value);
+        return Number.isFinite(y) ? y : 2024;
+      }
+
+      function getFileExt(name) {
+        const s = String(name || '').trim();
+        const idx = s.lastIndexOf('.');
+        return idx === -1 ? '' : s.slice(idx + 1).toLowerCase();
+      }
+
+      function updateYearUi() {
+        const year = getSelectedYear();
+        const rule = YEAR_RULES[year] || YEAR_RULES[2024];
+        fileInput.setAttribute('accept', rule.accept);
+        helperEl.textContent = rule.label;
+        // Clear any previously selected file if it no longer matches.
+        const f = fileInput.files && fileInput.files[0];
+        if (f) {
+          const ext = getFileExt(f.name);
+          const ok = (year === 2024 && (ext === 'csv' || ext === 'xlsx' || ext === 'xls')) || (year === 2025 && ext === 'pdf');
+          if (!ok) fileInput.value = '';
+        }
+      }
+
+      yearEl.addEventListener('change', () => {
+        updateYearUi();
+        setStatus('');
+      });
+
+      updateYearUi();
 
       function setStatus(msg, kind) {
         statusEl.textContent = msg || '';
@@ -186,6 +230,17 @@
         const file = fileInput.files && fileInput.files[0];
         if (!file) return;
 
+        const year = getSelectedYear();
+        const ext = getFileExt(file.name);
+        const isValid2024 = year === 2024 && (ext === 'csv' || ext === 'xlsx' || ext === 'xls');
+        const isValid2025 = year === 2025 && ext === 'pdf';
+        if (!isValid2024 && !isValid2025) {
+          setStatus(year === 2025
+            ? 'Error: For 2025, only .pdf files are accepted.'
+            : 'Error: For 2024, only .csv or .xlsx files are accepted.', 'error');
+          return;
+        }
+
         try {
           setBusy(true);
           setStatus('Generating PDF...');
@@ -201,6 +256,7 @@
             body: JSON.stringify({
               filename: file.name,
               dataBase64: dataUrl,
+              year,
             }),
           });
 

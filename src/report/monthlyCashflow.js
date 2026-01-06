@@ -47,8 +47,18 @@ function computeMonthlyCashflow(rows, options = {}) {
       current.deposit = addMoney(current.deposit, row.PHP_CREDIT ?? 0) ?? current.deposit
     }
 
-    // Withdrawals: keep as any non-trade, non-dividend debit entries.
-    current.withdraw = addMoney(current.withdraw, row.PHP_DEBIT ?? 0) ?? current.withdraw
+    // Withdrawals should only reflect money taken out of the broker (cash-out),
+    // not internal trades/fees/taxes/bond purchases.
+    // In FMSEC ledgers, these are typically CV rows (e.g. auto credit to client's bank)
+    // and/or rows explicitly mentioning a withdrawal request.
+    const looksLikeWithdrawal =
+      cd === 'CV' ||
+      particulars.includes('WITHDRAWAL') ||
+      particulars.includes('AUTO CREDIT TO CLIENT')
+
+    if (looksLikeWithdrawal) {
+      current.withdraw = addMoney(current.withdraw, row.PHP_DEBIT ?? 0) ?? current.withdraw
+    }
 
     byMonth.set(monthIndex, current)
   }
